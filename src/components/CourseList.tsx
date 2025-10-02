@@ -1,4 +1,6 @@
 // src/components/CourseList.tsx
+import CourseCard from './CourseCard';
+
 type Course = {
   term: string;
   number: string;
@@ -12,11 +14,9 @@ type CourseListProps = {
 
 export default function CourseList({ courses }: CourseListProps) {
   return (
-    <div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {Object.entries(courses).map(([id, c]) => (
-        <div key={id}>
-          {c.term} CS {c.number}: {c.title}
-        </div>
+        <CourseCard key={id} course={c} />
       ))}
     </div>
   );

@@ -34,10 +34,9 @@ const schedule = {
 
 export default function App() {
   return (
-    <div>
+    <main className="max-w-6xl mx-auto px-4 py-6">
       <Banner title={schedule.title} />
       <CourseList courses={schedule.courses} />
-    </div>
+    </main>
   );
 }
-
