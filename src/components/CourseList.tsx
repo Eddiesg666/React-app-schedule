@@ -12,19 +12,29 @@ type Course = {
 type CourseListProps = {
   courses: Record<string, Course>;
   selectedTerm: Term;
+  selectedIds: string[];
+  toggleSelected: (id: string) => void;
 };
 
-export default function CourseList({ courses, selectedTerm }: CourseListProps) {
-  const entries = Object
-    .entries(courses)
+export default function CourseList({
+  courses,
+  selectedTerm,
+  selectedIds,
+  toggleSelected,
+}: CourseListProps) {
+  const entries = Object.entries(courses)
     .filter(([_, c]) => c.term === selectedTerm)
-    // optional: stable order by catalog number then id
     .sort(([, a], [, b]) => a.number.localeCompare(b.number));
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {entries.map(([id, c]) => (
-        <CourseCard key={id} course={c} />
+        <CourseCard
+          key={id}
+          course={c}
+          selected={selectedIds.includes(id)}
+          onToggle={() => toggleSelected(id)}
+        />
       ))}
     </div>
   );
