@@ -1,4 +1,5 @@
-import { FormEvent, useMemo } from 'react';
+import type { FormEvent } from 'react';
+import { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 type Course = {
