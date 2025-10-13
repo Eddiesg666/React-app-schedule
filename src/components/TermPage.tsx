@@ -1,8 +1,8 @@
-// src/components/TermPage.tsx
 import { useState } from 'react';
 import TermSelector, { type Term } from './TermSelector';
 import CourseList from './CourseList';
 import CoursePlanModal from './CoursePlanModal';
+import { conflictsWithAny } from '../utilities/conflicts';
 
 type Course = {
   term: Term;
@@ -10,8 +10,9 @@ type Course = {
   meets: string;
   title: string;
 };
-export type CoursesById = Record<string, Course>;
+type CoursesById = Record<string, Course>;
 
+// helper: immutable toggle
 const toggleList = <T,>(x: T, lst: T[]) =>
   lst.includes(x) ? lst.filter((y) => y !== x) : [...lst, x];
 
@@ -20,17 +21,27 @@ export default function TermPage({ courses }: { courses: CoursesById }) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [planOpen, setPlanOpen] = useState(false);
 
-  const toggleSelected = (id: string) =>
-    setSelectedIds((prev) => toggleList(id, prev));
+  const selectedCoursesObjs = selectedIds
+    .map((id) => courses[id])
+    .filter((c): c is Course => Boolean(c));
 
-  // Build the items for the modal
+  const onToggle = (id: string) => setSelectedIds((prev) => toggleList(id, prev));
+
+  // This matches your CourseList prop: (id) => boolean
+  const conflicts = (id: string): boolean => {
+    // never disable a card that is already selected (must be unselectable)
+    if (selectedIds.includes(id)) return false;
+    const c = courses[id];
+    if (!c) return false;
+    return conflictsWithAny(c, selectedCoursesObjs);
+  };
+
   const planItems = selectedIds
     .map((id) => ({ id, course: courses[id] }))
     .filter((x): x is { id: string; course: Course } => Boolean(x.course));
 
   return (
     <section>
-      {/* Toolbar: selector left, plan button right */}
       <div className="flex items-center justify-between mb-4">
         <TermSelector selected={selectedTerm} setSelected={setSelectedTerm} />
         <button
@@ -41,16 +52,14 @@ export default function TermPage({ courses }: { courses: CoursesById }) {
         </button>
       </div>
 
-      {/* (Optional) inline summary can be removed now if you like */}
-      {/* <div className="mb-4 text-sm text-gray-600">
-        {selectedIds.length} selected
-      </div> */}
-
+      {/* Filter courses by selectedTerm and pass the current API */}
       <CourseList
-        courses={courses}
-        selectedTerm={selectedTerm}
-        selectedIds={selectedIds}
-        toggleSelected={toggleSelected}
+        courses={Object.fromEntries(
+          Object.entries(courses).filter(([, c]) => c.term === selectedTerm)
+        )}
+        selectedCourses={selectedIds}
+        onToggle={onToggle}
+        conflicts={conflicts}
       />
 
       <CoursePlanModal

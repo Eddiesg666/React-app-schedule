@@ -1,56 +1,30 @@
-// src/components/CourseList.tsx
 import CourseCard from './CourseCard';
-import type { Term } from './TermSelector';
-import { conflictsWithAny } from '../utilities/conflicts';
 
-type Course = {
-  term: Term;
-  number: string;
-  meets: string;
-  title: string;
-};
-
-type CourseListProps = {
-  courses: Record<string, Course>;
-  selectedTerm: Term;
-  selectedIds: string[];
-  toggleSelected: (id: string) => void;
-};
+interface CourseListProps {
+  courses: Record<string, any>;
+  selectedCourses: string[];
+  onToggle: (id: string) => void;
+  conflicts: (id: string) => boolean;
+}
 
 export default function CourseList({
   courses,
-  selectedTerm,
-  selectedIds,
-  toggleSelected,
+  selectedCourses,
+  onToggle,
+  conflicts,
 }: CourseListProps) {
-  // Build the selected courses array (objects) for conflict checks
-  const selectedCourses = selectedIds
-    .map((id) => courses[id])
-    .filter((c): c is Course => Boolean(c));
-
-  const entries = Object.entries(courses)
-    .filter(([_, c]) => c.term === selectedTerm)
-    .sort(([, a], [, b]) => a.number.localeCompare(b.number));
-
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {entries.map(([id, c]) => {
-        const isSelected = selectedIds.includes(id);
-
-        // Only disable if NOT already selected, and conflicts with any selected course
-        const isDisabled =
-          !isSelected && conflictsWithAny(c, selectedCourses);
-
-        return (
-          <CourseCard
-            key={id}
-            course={c}
-            selected={isSelected}
-            disabled={isDisabled}
-            onToggle={() => toggleSelected(id)}
-          />
-        );
-      })}
+    <div className="grid grid-cols-[repeat(auto-fill,_minmax(250px,_1fr))] gap-4 px-4">
+      {Object.entries(courses).map(([id, course]) => (
+        <CourseCard
+          key={id}
+          id={id} // ✅ pass the course ID
+          course={course}
+          selected={selectedCourses.includes(id)}
+          disabled={conflicts(id)}
+          onToggle={() => onToggle(id)}
+        />
+      ))}
     </div>
   );
 }

@@ -1,4 +1,5 @@
-// src/components/CourseCard.tsx
+import { Link } from 'react-router-dom';
+
 type Course = {
   term: 'Fall' | 'Winter' | 'Spring';
   number: string;
@@ -7,11 +8,13 @@ type Course = {
 };
 
 export default function CourseCard({
+  id,
   course,
   selected = false,
   disabled = false,
   onToggle,
 }: {
+  id?: string;
   course: Course;
   selected?: boolean;
   disabled?: boolean;
@@ -26,7 +29,7 @@ export default function CourseCard({
     : 'bg-white border-gray-200 hover:bg-gray-50';
   const interactivity = disabled ? 'cursor-not-allowed' : 'cursor-pointer';
 
-  const handle = () => {
+  const handleClick = () => {
     if (!disabled) onToggle?.();
   };
 
@@ -34,7 +37,7 @@ export default function CourseCard({
     <div
       role={disabled ? undefined : 'button'}
       tabIndex={disabled ? -1 : 0}
-      onClick={handle}
+      onClick={handleClick}
       onKeyDown={(e) =>
         !disabled && (e.key === 'Enter' || e.key === ' ') && onToggle?.()
       }
@@ -50,6 +53,19 @@ export default function CourseCard({
           <p className="text-sm">{course.title}</p>
         </div>
 
+        {/* ✅ Edit link — stops click from toggling selection */}
+        {id && (
+          <Link
+            to={`/courses/${id}/edit`}
+            onClick={(e) => e.stopPropagation()}
+            className="ml-2 text-xs underline text-blue-700 hover:text-blue-900"
+            title="Edit this course"
+          >
+            Edit
+          </Link>
+        )}
+
+        {/* ✅ Status badges */}
         {selected && (
           <span
             className="ml-2 inline-flex items-center justify-center w-6 h-6 text-white bg-indigo-600 rounded-full text-sm"
