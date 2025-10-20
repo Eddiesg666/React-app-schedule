@@ -1,10 +1,9 @@
 // src/utilities/firebase.ts
 import { useEffect, useState } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getDatabase, onValue, ref } from 'firebase/database';
+import { getDatabase, onValue, ref, update } from 'firebase/database';
 
-// 🟣 Replace with your real config from:
-// Firebase console → Project settings → General → Your apps → Web app → "Config" radio button
+// 🔁 Your config (what you already have)
 const firebaseConfig = {
   apiKey: "AIzaSyBuPprQ_4j4zyECfTzMwmF377Mh17aXQpI",
   authDomain: "react-app-schedule-b1f91.firebaseapp.com",
@@ -13,15 +12,13 @@ const firebaseConfig = {
   storageBucket: "react-app-schedule-b1f91.firebasestorage.app",
   messagingSenderId: "270323697227",
   appId: "1:270323697227:web:5b7117438810ba1ebdafce",
-  measurementId: "G-ZHM6G4FRNF"  
+  measurementId: "G-ZHM6G4FRNF"
 };
 
-
-// Initialize (singleton)
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-/** Subscribe to a Realtime Database path; returns [data, loading, error] */
+// Read hook (unchanged)
 export function useDataQuery(path: string): [unknown, boolean, Error | undefined] {
   const [data, setData] = useState<unknown>();
   const [loading, setLoading] = useState<boolean>(true);
@@ -32,7 +29,6 @@ export function useDataQuery(path: string): [unknown, boolean, Error | undefined
     setError(undefined);
     setData(undefined);
 
-    // Subscribe; Firebase returns an unsubscribe function
     const off = onValue(
       ref(db, path),
       (snap) => {
@@ -45,8 +41,13 @@ export function useDataQuery(path: string): [unknown, boolean, Error | undefined
       }
     );
 
-    return off; // cleanup: remove listener when unmounted or path changes
+    return off;
   }, [path]);
 
   return [data, loading, error];
+}
+
+// ✅ NEW: tiny helper for partial updates
+export function updateAt(path: string, values: Record<string, unknown>) {
+  return update(ref(db, path), values);
 }
