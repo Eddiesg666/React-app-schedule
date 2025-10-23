@@ -1,6 +1,8 @@
 {
   "rules": {
-    ".read": "now < 1763272800000",
-    ".write": "now < 1763272800000"
+    ".read": true,
+    "courses": {
+      ".write": "auth != null"
+    }
   }
 }

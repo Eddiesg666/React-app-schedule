@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
+import { useAuthState } from '../utilities/firebase';
 
 type Course = {
-  term: 'Fall' | 'Winter' | 'Spring';
+  term: 'Fall' | 'Winter' | 'Spring' | 'Summer';
   number: string;
   meets: string;
   title: string;
@@ -20,6 +21,8 @@ export default function CourseCard({
   disabled?: boolean;
   onToggle?: () => void;
 }) {
+  const { isAuthenticated } = useAuthState(); // 👈 who’s signed in?
+
   const base =
     'border rounded-xl shadow-sm p-4 h-full flex flex-col justify-between transition-colors';
   const color = selected
@@ -53,8 +56,8 @@ export default function CourseCard({
           <p className="text-sm">{course.title}</p>
         </div>
 
-        {/* ✅ Edit link — stops click from toggling selection */}
-        {id && (
+        {/* Only show when authenticated */}
+        {id && isAuthenticated && (
           <Link
             to={`/courses/${id}/edit`}
             onClick={(e) => e.stopPropagation()}
@@ -65,20 +68,13 @@ export default function CourseCard({
           </Link>
         )}
 
-        {/* ✅ Status badges */}
         {selected && (
-          <span
-            className="ml-2 inline-flex items-center justify-center w-6 h-6 text-white bg-indigo-600 rounded-full text-sm"
-            title="Selected"
-          >
+          <span className="ml-2 inline-flex items-center justify-center w-6 h-6 text-white bg-indigo-600 rounded-full text-sm" title="Selected">
             ✓
           </span>
         )}
         {disabled && !selected && (
-          <span
-            className="ml-2 inline-flex items-center justify-center w-6 h-6 text-white bg-gray-400 rounded-full text-sm"
-            title="Time conflict"
-          >
+          <span className="ml-2 inline-flex items-center justify-center w-6 h-6 text-white bg-gray-400 rounded-full text-sm" title="Time conflict">
             ×
           </span>
         )}

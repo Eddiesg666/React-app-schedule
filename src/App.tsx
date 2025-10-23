@@ -1,44 +1,84 @@
 // src/App.tsx
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import type { ReactNode } from 'react';
+
 import Banner from './components/Banner';
 import TermPage from './components/TermPage';
 import CourseForm from './components/CourseForm';
-import { useDataQuery } from './utilities/firebase';
+import { useDataQuery, useAuthState } from './utilities/firebase';
 import type { Term } from './components/TermSelector';
 
-// Reuse the same Term type TermPage uses (no Summer here)
+// ---- Types that match what TermPage expects ----
 type Course = {
-  term: Term;                 // <-- matches TermPage expectation
+  term: Term;            // 'Fall' | 'Winter' | 'Spring'
   number: string;
   meets: string;
   title: string;
 };
-
 type CoursesById = Record<string, Course>;
-type Schedule = {
+
+// What comes from Firebase (may include 'Summer' or other shapes)
+type ScheduleFromDb = {
   title: string;
-  courses: CoursesById;
+  courses: Record<string, { term: string; number: string; meets: string; title: string }>;
 };
 
-export default function App() {
-  // NOTE: do NOT write <Schedule> here; the hook isn't generic.
-  const [json, isLoading, error] = useDataQuery('/');  // or '/schedule' if you nested it
+// Narrow unknown string to Term (or null if not allowed)
+const toTerm = (t: string): Term | null =>
+  t === 'Fall' || t === 'Winter' || t === 'Spring' ? t as Term : null;
 
-  if (error)
-    return (
-      <main className="max-w-6xl mx-auto px-4 py-6">
-        <h1>Loading error: {String(error.message || error)}</h1>
-      </main>
-    );
-
-  if (isLoading || !json)
+// ---- Auth guard for the edit route ----
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { isAuthenticated, isInitialLoading } = useAuthState();
+  if (isInitialLoading) {
     return (
       <main className="max-w-6xl mx-auto px-4 py-6">
         <h1>Loading…</h1>
       </main>
     );
+  }
+  return isAuthenticated ? <>{children}</> : <Navigate to="/" replace />;
+}
 
-  const schedule = json as Schedule;
+export default function App() {
+  // If your data in Firebase is at the root with { title, courses }, use '/'.
+  // If you nested under /schedule, change to '/schedule'.
+  const [json, isLoading, error] = useDataQuery('/');
+
+  if (error) {
+    return (
+      <main className="max-w-6xl mx-auto px-4 py-6">
+        <h1>Loading error: {String((error as Error).message || error)}</h1>
+      </main>
+    );
+  }
+
+  if (isLoading || !json) {
+    return (
+      <main className="max-w-6xl mx-auto px-4 py-6">
+        <h1>Loading…</h1>
+      </main>
+    );
+  }
+
+  // Normalize DB payload → coerce fields to strings and drop non-Term (e.g., Summer)
+  const db = json as ScheduleFromDb;
+
+  const courses: CoursesById = Object.fromEntries(
+    Object.entries(db.courses ?? {}).flatMap(([id, c]) => {
+      const term = toTerm(String(c.term));
+      if (!term) return []; // drop Summer or unexpected term values
+      return [[
+        id,
+        {
+          term,
+          number: String(c.number),
+          meets: String(c.meets ?? ''),
+          title: String(c.title),
+        } satisfies Course,
+      ]];
+    })
+  );
 
   return (
     <Routes>
@@ -46,14 +86,19 @@ export default function App() {
         path="/"
         element={
           <main className="max-w-6xl mx-auto px-4 py-6">
-            <Banner title={schedule.title} />
-            <TermPage courses={schedule.courses} />
+            <Banner title={String(db.title ?? 'Courses')} />
+            <TermPage courses={courses} />
           </main>
         }
       />
       <Route
         path="/courses/:id/edit"
-        element={<CourseForm courses={schedule.courses} />}
+        element={
+          <RequireAuth>
+            {/* Pass the same normalized map to keep types consistent */}
+            <CourseForm courses={courses} />
+          </RequireAuth>
+        }
       />
     </Routes>
   );
