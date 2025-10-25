@@ -1,128 +1,116 @@
 // src/components/CourseForm.tsx
 import { useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { useForm, type SubmitHandler, type SubmitErrorHandler } from 'react-hook-form';
-import CourseField from './CourseField';
-import { courseResolver, type CourseFormData, TermEnum } from '../types/courses';
-import { updateAt } from '../utilities/firebase';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useForm, type SubmitErrorHandler, type SubmitHandler } from 'react-hook-form';
+import { ref, update } from 'firebase/database';
 
-type Course = {
-  term: 'Fall' | 'Winter' | 'Spring' | 'Summer';
-  number: string;
-  meets: string;
-  title: string;
-};
-type CoursesById = Record<string, Course>;
+import CourseField from './CourseField';
+import { database } from '../utilities/firebase';
+import { courseResolver, TermEnum, type CourseFormData, type CoursesById } from '../types/courses';
 
 export default function CourseForm({ courses }: { courses: CoursesById }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const course = useMemo(() => (id ? courses[id] : undefined), [id, courses]);
+  const course = useMemo(() => (id ? courses[id] : undefined), [courses, id]);
+
+  // Fallback if no course found
+  if (!id || !course) {
+    return (
+      <div className="max-w-[1200px] mx-auto px-8 py-8">
+        <h1 className="text-xl font-semibold">Course not found</h1>
+      </div>
+    );
+  }
+
+  const defaultValues: CourseFormData = {
+    title: course.title,
+    term: course.term,
+    number: course.number,
+    meets: course.meets ?? '',
+  };
 
   const {
     register,
     handleSubmit,
-    getValues,
-    formState: { errors, isSubmitting, isValid, dirtyFields, isDirty },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<CourseFormData>({
-    defaultValues: {
-      title: course?.title ?? '',
-      term: (course?.term as CourseFormData['term']) ?? 'Fall',
-      number: course?.number ?? '',
-      meets: course?.meets ?? '',
-    },
-    resolver: courseResolver,
+    defaultValues,
     mode: 'onChange',
+    resolver: courseResolver,
   });
 
-const onSubmit: SubmitHandler<CourseFormData> = async (_data) => {
-  if (!isDirty) return;
-  if (!id) return;
+  const termOptions = TermEnum.options; // ["Fall","Winter","Spring","Summer"]
 
-  const dirtyKeys = Object.keys(dirtyFields) as (keyof CourseFormData)[];
-  const patch = Object.fromEntries(
-    dirtyKeys.map((k) => [k, getValues(k)])
-  ) as Partial<CourseFormData>;
+  const onSubmit: SubmitHandler<CourseFormData> = async (data) => {
+    // No network call if nothing changed or still submitting
+    if (!isDirty || isSubmitting) return;
 
-  if (Object.keys(patch).length === 0) return;
+    // Persist updates to /courses/<id>
+    await update(ref(database, `courses/${id}`), data);
 
-  try {
-    await updateAt(`/courses/${id}`, patch); // or `/schedule/courses/${id}` if that’s your structure
-    navigate(-1);
-  } catch (err) {
-    console.error('Update failed:', err);
-    alert('Saving failed. Please try again.');
-  }
-};
-
+    // Back to list
+    navigate('/');
+  };
 
   const onError: SubmitErrorHandler<CourseFormData> = () => {
-    // Optional: surface a toast, but inline field errors already show why
+    // Let the inline field messages guide the user
   };
 
   return (
-    <main className="max-w-xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold mb-4">
-        {course ? `Edit: CS ${course.number}` : 'Edit course'}
-      </h1>
+    <form onSubmit={handleSubmit(onSubmit, onError)} className="max-w-[720px]">
+      {/* Hidden ID field not required; we use the URL param */}
+      <CourseField
+        name="title"
+        label="Title"
+        register={register}
+        errors={errors}
+        placeholder="e.g., Fundamentals of Computer Programming I"
+      />
 
-      <form onSubmit={handleSubmit(onSubmit, onError)} className="space-y-4">
-        <CourseField
-          name="title"
-          label="Title"
-          register={register}
-          errors={errors}
-          placeholder='e.g., "Algorithms"'
-        />
+      <CourseField
+        name="term"
+        label="Term"
+        register={register}
+        errors={errors}
+        as="select"
+        options={termOptions}
+      />
 
-        <CourseField
-          name="term"
-          label="Term"
-          register={register}
-          errors={errors}
-          as="select"
-          options={TermEnum.options} // ["Fall","Winter","Spring","Summer"]
-        />
+      <CourseField
+        name="number"
+        label="Course number"
+        register={register}
+        errors={errors}
+        placeholder='e.g., "213" or "213-2"'
+      />
 
-        <CourseField
-          name="number"
-          label="Course number"
-          register={register}
-          errors={errors}
-          placeholder='e.g., "213" or "213-2"'
-        />
+      <CourseField
+        name="meets"
+        label="Meets"
+        register={register}
+        errors={errors}
+        placeholder='e.g., "MWF 12:00-13:20" or blank'
+        as="textarea"
+      />
 
-        <CourseField
-          name="meets"
-          label="Meets"
-          register={register}
-          errors={errors}
-          placeholder='e.g., "MWF 12:00-13:20" or empty'
-        />
+      <div className="mt-4 flex gap-3">
+        <button
+          type="submit"
+          disabled={isSubmitting || !isDirty}
+          className="px-4 py-2 rounded border shadow-sm bg-black text-white disabled:opacity-40"
+        >
+          {isSubmitting ? 'Saving…' : 'Submit'}
+        </button>
 
-        <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="px-3 py-1.5 rounded-md border border-gray-300 hover:bg-gray-50 disabled:opacity-60"
-            disabled={isSubmitting}
-          >
-            Cancel
-          </button>
-
-          <button
-            type="submit"
-            className="px-3 py-1.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60"
-            disabled={isSubmitting || !isValid || !isDirty}
-            title={
-              !isValid ? 'Fix form errors first' : !isDirty ? 'No changes made' : 'Save changes'
-            }
-          >
-            Submit
-          </button>
-        </div>
-      </form>
-    </main>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="px-4 py-2 rounded border shadow-sm bg-white"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }

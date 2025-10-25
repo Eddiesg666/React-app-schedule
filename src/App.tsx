@@ -1,38 +1,17 @@
 // src/App.tsx
 import { Routes, Route, Navigate } from 'react-router-dom';
-import type { ReactNode } from 'react';
-
 import Banner from './components/Banner';
 import TermPage from './components/TermPage';
 import CourseForm from './components/CourseForm';
 import { useDataQuery, useAuthState } from './utilities/firebase';
-import type { Term } from './components/TermSelector';
+import { useProfile } from './utilities/profile';
+import type { CoursesById } from './types/courses';
 
-// ---- Types that match what TermPage expects ----
-type Course = {
-  term: Term;            // 'Fall' | 'Winter' | 'Spring'
-  number: string;
-  meets: string;
-  title: string;
-};
-type CoursesById = Record<string, Course>;
-
-// What comes from Firebase (may include 'Summer' or other shapes)
-type ScheduleFromDb = {
-  title: string;
-  courses: Record<string, { term: string; number: string; meets: string; title: string }>;
-};
-
-// Narrow unknown string to Term (or null if not allowed)
-const toTerm = (t: string): Term | null =>
-  t === 'Fall' || t === 'Winter' || t === 'Spring' ? t as Term : null;
-
-// ---- Auth guard for the edit route ----
-function RequireAuth({ children }: { children: ReactNode }) {
+function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isInitialLoading } = useAuthState();
   if (isInitialLoading) {
     return (
-      <main className="max-w-6xl mx-auto px-4 py-6">
+      <main className="max-w-[1200px] mx-auto px-8 py-8">
         <h1>Loading…</h1>
       </main>
     );
@@ -40,53 +19,59 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return isAuthenticated ? <>{children}</> : <Navigate to="/" replace />;
 }
 
-export default function App() {
-  // If your data in Firebase is at the root with { title, courses }, use '/'.
-  // If you nested under /schedule, change to '/schedule'.
-  const [json, isLoading, error] = useDataQuery('/');
-
-  if (error) {
+function RequireAdmin({ children }: { children: React.ReactNode }) {
+  const [{ isAdmin }, loading, error] = useProfile();
+  if (loading) {
     return (
-      <main className="max-w-6xl mx-auto px-4 py-6">
-        <h1>Loading error: {String((error as Error).message || error)}</h1>
-      </main>
-    );
-  }
-
-  if (isLoading || !json) {
-    return (
-      <main className="max-w-6xl mx-auto px-4 py-6">
+      <main className="max-w-[1200px] mx-auto px-8 py-8">
         <h1>Loading…</h1>
       </main>
     );
   }
+  if (error) {
+    return (
+      <main className="max-w-[1200px] mx-auto px-8 py-8">
+        <h1>Profile load error</h1>
+      </main>
+    );
+  }
+  return isAdmin ? <>{children}</> : <Navigate to="/" replace />;
+}
 
-  // Normalize DB payload → coerce fields to strings and drop non-Term (e.g., Summer)
-  const db = json as ScheduleFromDb;
+export default function App() {
+  // ✅ Read only the nodes we allow publicly: /title and /courses
+  const [titleRaw, loadingTitle, errorTitle] = useDataQuery('/title');
+  const [coursesRaw, loadingCourses, errorCourses] = useDataQuery('/courses');
 
-  const courses: CoursesById = Object.fromEntries(
-    Object.entries(db.courses ?? {}).flatMap(([id, c]) => {
-      const term = toTerm(String(c.term));
-      if (!term) return []; // drop Summer or unexpected term values
-      return [[
-        id,
-        {
-          term,
-          number: String(c.number),
-          meets: String(c.meets ?? ''),
-          title: String(c.title),
-        } satisfies Course,
-      ]];
-    })
-  );
+  if (errorTitle || errorCourses) {
+    return (
+      <main className="max-w-[1200px] mx-auto px-8 py-8">
+        <h1>
+          Error loading data:{' '}
+          {String(errorTitle ?? errorCourses)}
+        </h1>
+      </main>
+    );
+  }
+
+  if (loadingTitle || loadingCourses || titleRaw === undefined || coursesRaw === undefined) {
+    return (
+      <main className="max-w-[1200px] mx-auto px-8 py-8">
+        <h1>Loading courses…</h1>
+      </main>
+    );
+  }
+
+  const title = (titleRaw as string) ?? 'CS Course Scheduler';
+  const courses = (coursesRaw as CoursesById) ?? {};
 
   return (
     <Routes>
       <Route
         path="/"
         element={
-          <main className="max-w-6xl mx-auto px-4 py-6">
-            <Banner title={String(db.title ?? 'Courses')} />
+          <main className="max-w-[1200px] mx-auto px-8 py-8">
+            <Banner title={title} />
             <TermPage courses={courses} />
           </main>
         }
@@ -95,11 +80,16 @@ export default function App() {
         path="/courses/:id/edit"
         element={
           <RequireAuth>
-            {/* Pass the same normalized map to keep types consistent */}
-            <CourseForm courses={courses} />
+            <RequireAdmin>
+              <main className="max-w-[1200px] mx-auto px-8 py-8">
+                <Banner title={title} />
+                <CourseForm courses={courses} />
+              </main>
+            </RequireAdmin>
           </RequireAuth>
         }
       />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

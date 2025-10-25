@@ -1,72 +1,101 @@
-import { useState } from 'react';
-import TermSelector, { type Term } from './TermSelector';
+// src/components/TermPage.tsx
+import { useMemo, useState } from 'react';
 import CourseList from './CourseList';
-import CoursePlanModal from './CoursePlanModal';
+import Modal from './Modal';
+import type { CoursesById } from '../types/courses';
 import { conflictsWithAny } from '../utilities/conflicts';
 
-type Course = {
-  term: Term;
-  number: string;
-  meets: string;
-  title: string;
-};
-type CoursesById = Record<string, Course>;
+type Term = 'Fall' | 'Winter' | 'Spring' | 'Summer';
 
-// helper: immutable toggle
-const toggleList = <T,>(x: T, lst: T[]) =>
-  lst.includes(x) ? lst.filter((y) => y !== x) : [...lst, x];
+interface TermPageProps {
+  courses: CoursesById;
+}
 
-export default function TermPage({ courses }: { courses: CoursesById }) {
+export default function TermPage({ courses }: TermPageProps) {
   const [selectedTerm, setSelectedTerm] = useState<Term>('Fall');
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   const [planOpen, setPlanOpen] = useState(false);
 
-  const selectedCoursesObjs = selectedIds
-    .map((id) => courses[id])
-    .filter((c): c is Course => Boolean(c));
+  const courseArray = useMemo(
+    () => Object.entries(courses).map(([id, c]) => ({ id, ...c })),
+    [courses]
+  );
 
-  const onToggle = (id: string) => setSelectedIds((prev) => toggleList(id, prev));
+  const visible = useMemo(
+    () => courseArray.filter((c) => c.term === selectedTerm),
+    [courseArray, selectedTerm]
+  );
 
-  // This matches your CourseList prop: (id) => boolean
-  const conflicts = (id: string): boolean => {
-    // never disable a card that is already selected (must be unselectable)
-    if (selectedIds.includes(id)) return false;
-    const c = courses[id];
-    if (!c) return false;
-    return conflictsWithAny(c, selectedCoursesObjs);
+  const selectedCourseObjects = useMemo(
+    () => selectedCourses.map((id) => ({ id, ...courses[id] })),
+    [selectedCourses, courses]
+  );
+
+  const conflicts = (id: string) => {
+    const target = courses[id];
+    if (!target) return false;
+    const others = selectedCourseObjects.filter((c) => c.id !== id);
+    return conflictsWithAny(target, others);
   };
 
-  const planItems = selectedIds
-    .map((id) => ({ id, course: courses[id] }))
-    .filter((x): x is { id: string; course: Course } => Boolean(x.course));
+  const toggle = (id: string) => {
+    setSelectedCourses((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
 
   return (
-    <section>
-      <div className="flex items-center justify-between mb-4">
-        <TermSelector selected={selectedTerm} setSelected={setSelectedTerm} />
+    // ⬇️ add top margin to push controls (and Course plan) down from the banner’s line
+    <div className="w-full mt-8">
+      {/* Term selector + Course plan button (still aligned horizontally) */}
+      <div className="flex items-center gap-2 mb-4">
+        {(['Fall', 'Winter', 'Spring', 'Summer'] as Term[]).map((t) => (
+          <button
+            key={t}
+            onClick={() => setSelectedTerm(t)}
+            className={`px-3 py-1 rounded border ${
+              selectedTerm === t ? 'bg-indigo-600 text-white' : 'bg-white'
+            }`}
+          >
+            {t}
+          </button>
+        ))}
+
         <button
-          className="px-3 py-1.5 rounded-md border border-gray-300 text-sm hover:bg-gray-50"
           onClick={() => setPlanOpen(true)}
+          className="ml-auto px-3 py-1 rounded border bg-white"
         >
           Course plan
         </button>
       </div>
 
-      {/* Filter courses by selectedTerm and pass the current API */}
       <CourseList
-        courses={Object.fromEntries(
-          Object.entries(courses).filter(([, c]) => c.term === selectedTerm)
-        )}
-        selectedCourses={selectedIds}
-        onToggle={onToggle}
+        courses={Object.fromEntries(visible.map((c) => [c.id, c]))}
+        selectedCourses={selectedCourses}
+        onToggle={toggle}
         conflicts={conflicts}
       />
 
-      <CoursePlanModal
-        isOpen={planOpen}
-        onClose={() => setPlanOpen(false)}
-        items={planItems}
-      />
-    </section>
+      <Modal isOpen={planOpen} onClose={() => setPlanOpen(false)}>
+        <h2 className="text-lg font-bold mb-2">Your course plan</h2>
+        {selectedCourses.length === 0 ? (
+          <p className="text-sm">
+            No courses selected yet. Click a course card to select it; click
+            again to unselect.
+          </p>
+        ) : (
+          <ul className="list-disc ml-6">
+            {selectedCourses.map((id) => {
+              const c = courses[id];
+              return (
+                <li key={id}>
+                  CS {c.number} — {c.title} ({c.meets || 'TBA'})
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Modal>
+    </div>
   );
 }

@@ -1,3 +1,4 @@
+// src/components/CourseList.tsx
 import CourseCard from './CourseCard';
 
 interface CourseListProps {
@@ -14,17 +15,21 @@ export default function CourseList({
   conflicts,
 }: CourseListProps) {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,_minmax(250px,_1fr))] gap-4 px-4">
-      {Object.entries(courses).map(([id, course]) => (
-        <CourseCard
-          key={id}
-          id={id} // ✅ pass the course ID
-          course={course}
-          selected={selectedCourses.includes(id)}
-          disabled={conflicts(id)}
-          onToggle={() => onToggle(id)}
-        />
-      ))}
+    <div className="grid grid-cols-[repeat(auto-fill,_minmax(260px,_1fr))] gap-4">
+      {Object.entries(courses).map(([id, course]) => {
+        const isSelected = selectedCourses.includes(id);
+        const isDisabled = !isSelected && conflicts(id);
+        return (
+          <CourseCard
+            key={id}
+            id={id}
+            course={course}
+            selected={isSelected}
+            disabled={isDisabled}
+            onToggle={() => onToggle(id)}
+          />
+        );
+      })}
     </div>
   );
 }

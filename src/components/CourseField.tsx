@@ -1,15 +1,19 @@
-import type { CourseFormData } from '../types/courses';
+// src/components/CourseField.tsx
 import type { FieldErrors, UseFormRegister } from 'react-hook-form';
+import type { CourseFormData } from '../types/courses';
 
-interface CourseFieldProps {
-  name: keyof CourseFormData;
+type FieldName = keyof CourseFormData;
+type FieldKind = 'input' | 'textarea' | 'select';
+
+export interface CourseFieldProps {
+  name: FieldName;
   label: string;
   register: UseFormRegister<CourseFormData>;
   errors: FieldErrors<CourseFormData>;
-  type?: string;
   placeholder?: string;
-  as?: 'input' | 'select' | 'textarea';
-  options?: string[]; // for select
+  as?: FieldKind;              // "input" (default), "textarea", or "select"
+  options?: string[];          // required when as === "select"
+  disabled?: boolean;
 }
 
 export default function CourseField({
@@ -17,29 +21,40 @@ export default function CourseField({
   label,
   register,
   errors,
-  type = 'text',
   placeholder,
   as = 'input',
   options = [],
+  disabled = false,
 }: CourseFieldProps) {
-  const err = errors[name]?.message as string | undefined;
+  const hasError = !!errors[name];
+  const errorMsg = errors[name]?.message as string | undefined;
+
+  const base =
+    `w-full rounded border ${hasError ? 'border-red-500' : 'border-gray-300'} 
+     bg-inherit p-3 shadow shadow-gray-100 mt-2 appearance-none outline-none`;
 
   return (
-    <label className="block">
-      <p className="text-sm font-medium">
+    <label className="block mb-4">
+      <p className="text-lg font-medium">
         {label}
-        {err && (
-          <span className="text-xs text-red-500 italic pl-2">{err}</span>
+        {hasError && (
+          <span className="text-sm inline-block pl-2 text-red-500 italic">
+            {errorMsg}
+          </span>
         )}
       </p>
 
       {as === 'select' ? (
         <select
+          // register supplies name/onChange/onBlur/ref – spread them in
           {...register(name)}
-          className={`mt-1 w-full rounded-md border ${
-            err ? 'border-red-500' : 'border-gray-300'
-          } px-3 py-2 bg-white`}
+          className={base}
+          disabled={disabled}
         >
+          {/* Optional blank chooser */}
+          <option value="" disabled hidden>
+            Select…
+          </option>
           {options.map((opt) => (
             <option key={opt} value={opt}>
               {opt}
@@ -50,19 +65,17 @@ export default function CourseField({
         <textarea
           {...register(name)}
           placeholder={placeholder}
-          className={`mt-1 w-full rounded-md border ${
-            err ? 'border-red-500' : 'border-gray-300'
-          } px-3 py-2`}
+          className={base}
           rows={3}
+          disabled={disabled}
         />
       ) : (
         <input
-          type={type}
           {...register(name)}
           placeholder={placeholder}
-          className={`mt-1 w-full rounded-md border ${
-            err ? 'border-red-500' : 'border-gray-300'
-          } px-3 py-2`}
+          className={base}
+          type="text"
+          disabled={disabled}
         />
       )}
     </label>
